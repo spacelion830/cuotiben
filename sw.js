@@ -1,5 +1,5 @@
 /* 考研错题本 离线缓存 Service Worker */
-const CACHE = 'cuotiben-v1';
+const CACHE = 'cuotiben-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {

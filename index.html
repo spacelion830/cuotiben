@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>考研错题本</title>
 <meta name="description" content="考研错题本：上传错题图片和文字，按艾宾浩斯曲线自动安排复习。">
+<!-- 若部署到公网：禁止搜索引擎收录。本地双击打开时这些标签无副作用 -->
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.json">
@@ -142,6 +143,23 @@
   .stat .l{font-size:12px;color:var(--sub);margin-top:3px}
   .filters{display:flex;gap:8px;margin-bottom:12px}
   .filters input,.filters select{flex:1}
+
+  /* 分段选择 */
+  .seg{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .seg button{flex:1;min-width:88px;padding:8px 6px;font-size:13px;color:var(--sub)}
+  .seg button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+  .modebar{margin:-4px 0 12px}
+  .modebar button{width:100%;padding:9px 0;font-size:13px}
+
+  /* 刷题卡片 */
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px;margin-bottom:11px}
+  .pcard .ph{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub);margin-bottom:9px;gap:8px}
+  .pcard .stem img{max-width:100%;border-radius:8px;display:block;margin-bottom:9px;border:1px solid var(--line);background:#fff}
+  .pcard .ansbox{border-top:1px dashed var(--line);margin-top:11px;padding-top:11px}
+  .pcard .ansbox img{max-width:100%;border-radius:8px;display:block;margin-bottom:9px;border:1px solid var(--line);background:#fff}
+  .pcard .act{display:flex;gap:7px;margin-top:11px}
+  .pcard .act button{flex:1;padding:9px 2px;font-size:13px}
+  .mark{color:var(--warn)}
 </style>
 </head>
 <body>
@@ -173,8 +191,21 @@
       </div>
 
       <label>错因（强烈建议填，这是全库最有价值的字段）</label>
-      <input type="text" id="fReason" list="reasonList" placeholder="概念不清 / 计算失误 / 粗心看错 / 没思路 / 时间不够">
-      <datalist id="reasonList"></datalist>
+      <select id="fReason">
+        <option value="">— 请选择 —</option>
+        <option>概念不清</option>
+        <option>计算失误</option>
+        <option>粗心看错</option>
+        <option>没思路</option>
+        <option>时间不够</option>
+        <option>公式记错</option>
+        <option>方法不会</option>
+        <option>做过又错</option>
+        <option>其他</option>
+      </select>
+
+      <label>补充说明（可选，写清楚当时错在哪）</label>
+      <textarea id="fReasonNote" placeholder="例：把「至少有一个」看成「至少有两个」；第 2 步忘了讨论 a=0 的情况" style="min-height:62px"></textarea>
     </div>
 
     <div class="card">
@@ -216,7 +247,32 @@
       </select>
     </div>
     <input type="text" id="qText" placeholder="搜索题目文字 / 来源 / 错因" style="margin-bottom:12px">
+    <div class="modebar">
+      <button class="ghost" id="btnPracticeFromLib">▶ 把筛选出的题拿去刷</button>
+    </div>
     <div id="libList"></div>
+  </section>
+
+  <!-- ===== 刷题 ===== -->
+  <section id="v-practice" hidden>
+    <div class="card">
+      <label>选择科目</label>
+      <select id="pSubject"><option value="">全部科目</option></select>
+
+      <label>刷题范围</label>
+      <div class="seg" id="pScope">
+        <button type="button" class="on" data-scope="all">全部</button>
+        <button type="button" data-scope="unmastered">未掌握+模糊</button>
+        <button type="button" data-scope="star">★ 标记</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="pri" id="btnPracticeStart" style="flex:1">开始刷题</button>
+        <button class="ghost" id="btnPracticeShuffle" title="打乱顺序">🔀 打乱</button>
+      </div>
+      <div class="hint" id="practiceHint">选好科目后点「开始刷题」。刷题不会影响艾宾浩斯复习进度。</div>
+    </div>
+    <div id="practiceList"></div>
   </section>
 
   <!-- ===== 数据 ===== -->
@@ -251,6 +307,7 @@
 
 <nav>
   <button data-v="due" class="on"><span class="ic">🔁</span>复习<span class="badge" id="navBadge" hidden></span></button>
+  <button data-v="practice"><span class="ic">✍️</span>刷题</button>
   <button data-v="lib"><span class="ic">📚</span>题库</button>
   <button data-v="add"><span class="ic">➕</span>录入</button>
   <button data-v="more"><span class="ic">📊</span>数据</button>
@@ -344,6 +401,7 @@ const MASTERY=['未掌握','模糊','已掌握'];
 
 /* ================= 状态 ================= */
 let stemBuf=[], ansBuf=[], view='due', reviewQueue=[], reviewIdx=0, reviewShowAns=false;
+let lastLibList=[];
 
 /* ================= 工具 ================= */
 const $=id=>document.getElementById(id);
@@ -449,21 +507,22 @@ async function saveItem(){
     answerText:$('fAnsText').value.trim(),
     subject:($('fSubject').value.trim()||'未分类'),
     source:$('fSource').value.trim(),
-    reason:$('fReason').value.trim(),
+    reason:$('fReason').value,
+    reasonNote:$('fReasonNote').value.trim(),
     mastery:0, round:0,
     createdAt:now, nextReviewAt:startOfDay(now)+1*DAY, lastReviewedAt:null
   };
   await dbAdd('items',item);
   stemBuf=[]; ansBuf=[];
   renderThumbs($('thStem'),stemBuf); renderThumbs($('thAns'),ansBuf);
-  $('fText').value=''; $('fAnsText').value=''; $('fReason').value='';
+  $('fText').value=''; $('fAnsText').value=''; $('fReason').value=''; $('fReasonNote').value='';
   toast('已保存，明天进入复习队列');
   await refreshAll();
 }
 function clearForm(){
   stemBuf=[]; ansBuf=[];
   renderThumbs($('thStem'),stemBuf); renderThumbs($('thAns'),ansBuf);
-  ['fText','fAnsText','fSubject','fSource','fReason'].forEach(i=>$(i).value='');
+  ['fText','fAnsText','fSubject','fSource','fReason','fReasonNote'].forEach(i=>$(i).value='');
   toast('已清空');
 }
 
@@ -623,10 +682,11 @@ async function renderFocus(){
     ans.className='answer';
     const h=document.createElement('div');h.className='sec';h.textContent='解析 / 答案';
     ans.appendChild(h);
-    if(it.reason){
+    if(it.reason||it.reasonNote){
       const r=document.createElement('div');
       r.className='txt';
-      r.innerHTML='<b style="color:var(--warn)">上次错因：</b>'+esc(it.reason);
+      r.innerHTML='<b style="color:var(--warn)">上次错因：</b>'+esc(it.reason||'未填')
+        +(it.reasonNote?'<br><span style="color:var(--sub)">'+esc(it.reasonNote)+'</span>':'');
       ans.appendChild(r);
     }
     if(it.answerText){
@@ -638,7 +698,7 @@ async function renderFocus(){
       const u=await fileURL(id);
       if(u){const im=document.createElement('img');im.src=u;ans.appendChild(im)}
     }
-    if(!it.answerText && !(it.ansImages||[]).length && !it.reason){
+    if(!it.answerText && !(it.ansImages||[]).length && !it.reason && !it.reasonNote){
       const d=document.createElement('div');
       d.className='hint'; d.textContent='这道题没有录入解析。';
       ans.appendChild(d);
@@ -729,6 +789,7 @@ async function loadLib(){
     return true;
   }).sort((a,b)=>b.createdAt-a.createdAt);
 
+  lastLibList=list;
   const box=$('libList'); box.innerHTML='';
   if(!list.length){ box.innerHTML='<div class="empty">没有匹配的错题</div>'; return }
   for(const it of list){
@@ -752,6 +813,166 @@ async function loadLib(){
   box.appendChild(bar);
 }
 
+/* ================= 刷题模式 =================
+   只看题干，自己在本子上做；做完再展开答案对照。
+   刷题不会修改艾宾浩斯进度（进度只在「复习」里动）。 */
+let practiceItems=[], practiceScope='all', practiceMap=new Map();
+
+async function buildPracticePool(){
+  const all=await dbGetAll('items');
+  const sub=$('pSubject')?$('pSubject').value:'';
+  let list=all.filter(i=>!sub || i.subject===sub);
+  if(practiceScope==='unmastered')list=list.filter(i=>i.mastery<2);
+  if(practiceScope==='star')list=list.filter(i=>i.star);
+  list.sort((a,b)=>b.createdAt-a.createdAt);
+  practiceItems=list;
+  return list;
+}
+async function savePracticePrefs(){
+  try{ await dbPut('meta',{k:'practicePrefs',v:{subject:$('pSubject')?$('pSubject').value:'',scope:practiceScope}}) }catch(e){}
+}
+async function restorePracticePrefs(){
+  try{
+    const m=await dbGet('meta','practicePrefs');
+    if(!m||!m.v)return;
+    if(m.v.scope){
+      practiceScope=m.v.scope;
+      document.querySelectorAll('#pScope button').forEach(b=>b.classList.toggle('on',b.dataset.scope===practiceScope));
+    }
+    if(m.v.subject && $('pSubject')){
+      await loadMore();
+      $('pSubject').value=m.v.subject;
+    }
+  }catch(e){}
+}
+async function startPractice(shuffleOnly){
+  const list=await buildPracticePool();
+  if(!list.length){
+    $('practiceList').innerHTML='<div class="empty">这个范围里没有题目<br><span style="font-size:12px">换个科目，或先「录入」错题</span></div>';
+    $('practiceHint').textContent='没有题目。';
+    return;
+  }
+  if(shuffleOnly){
+    for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
+  }
+  practiceItems=list;
+  practiceMap=new Map();
+  await savePracticePrefs();
+  await renderPractice();
+  $('practiceHint').textContent=`已载入 ${list.length} 题${shuffleOnly?'（已打乱）':''}。做完一题点「对照答案」。`;
+}
+async function renderPractice(){
+  const box=$('practiceList');
+  box.innerHTML='';
+  if(!practiceItems.length)return;
+  let i=0;
+  for(const it of practiceItems){
+    i++;
+    practiceMap.set(it.id,false);
+    const card=document.createElement('div');
+    card.className='pcard';
+
+    const head=document.createElement('div');
+    head.className='ph';
+    const meta=document.createElement('span');
+    meta.textContent=`第 ${i}/${practiceItems.length} 题 · ${it.subject}`
+      +(it.source?` · ${it.source}`:'')
+      +(it.reason?` · 错因：${it.reason}`:'')
+      +(it.round?` · 第 ${it.round} 轮`:'');
+    const star=document.createElement('button');
+    star.type='button'; star.className='ghost sm';
+    star.textContent=it.star?'★':'☆';
+    if(it.star)star.classList.add('mark');
+    star.title='标记这道题，之后可按「★ 标记」单独刷';
+    star.onclick=async()=>{
+      it.star=!it.star;
+      await dbPut('items',it);
+      star.textContent=it.star?'★':'☆';
+      star.classList.toggle('mark',!!it.star);
+      toast(it.star?'已标记':'已取消标记');
+    };
+    head.appendChild(meta); head.appendChild(star);
+    card.appendChild(head);
+
+    const stem=document.createElement('div');
+    stem.className='stem';
+    for(const id of (it.stemImages||[])){
+      const u=await fileURL(id);
+      if(u){const im=document.createElement('img');im.src=u;stem.appendChild(im)}
+    }
+    if(it.text){
+      const t=document.createElement('div');
+      t.className='txt'; t.textContent=it.text;
+      stem.appendChild(t);
+    }
+    if(!(it.stemImages||[]).length && !it.text){
+      const t=document.createElement('div');
+      t.className='hint'; t.textContent='这道题没有题目内容。';
+      stem.appendChild(t);
+    }
+    card.appendChild(stem);
+
+    /* 答案区：默认是空的，必须手动展开 */
+    const ans=document.createElement('div');
+    ans.className='ansbox'; ans.hidden=true;
+    const ah=document.createElement('div');
+    ah.className='sec'; ah.textContent='答案 / 解析';
+    ans.appendChild(ah);
+    if(it.reason||it.reasonNote){
+      const r=document.createElement('div');
+      r.className='txt';
+      r.innerHTML='<b style="color:var(--warn)">错因：</b>'+esc(it.reason||'未填')
+        +(it.reasonNote?'<br><span style="color:var(--sub)">'+esc(it.reasonNote)+'</span>':'');
+      ans.appendChild(r);
+    }
+    if(it.answerText){
+      const at=document.createElement('div');
+      at.className='txt'; at.textContent=it.answerText;
+      ans.appendChild(at);
+    }
+    for(const id of (it.ansImages||[])){
+      const u=await fileURL(id);
+      if(u){const im=document.createElement('img');im.src=u;ans.appendChild(im)}
+    }
+    if(!it.answerText && !(it.ansImages||[]).length){
+      const d=document.createElement('div');
+      d.className='hint'; d.textContent='这道题没有录入答案/解析。';
+      ans.appendChild(d);
+    }
+    card.appendChild(ans);
+
+    const act=document.createElement('div');
+    act.className='act';
+    const bToggle=document.createElement('button');
+    bToggle.type='button'; bToggle.className='pri'; bToggle.textContent='对照答案';
+    bToggle.onclick=()=>{
+      const open=!ans.hidden;
+      ans.hidden=open;
+      practiceMap.set(it.id,!open);
+      bToggle.textContent=open?'对照答案':'收起答案';
+      if(!open){
+        const y=ans.getBoundingClientRect().top+window.scrollY-70;
+        window.scrollTo({top:y,behavior:'smooth'});
+      }
+    };
+    act.appendChild(bToggle);
+    for(const [txt,kind,label] of [['没做出来',0,'bad'],['做出来了',2,'ok']]){
+      const b=document.createElement('button');
+      b.type='button'; b.className=kind; b.textContent=txt;
+      b.title='只做记录，不影响艾宾浩斯复习进度';
+      b.onclick=async()=>{
+        b.disabled=true;
+        await dbAdd('reviews',{itemId:it.id,round:it.round,result:kind,practice:true,reviewedAt:Date.now()});
+        toast(kind===0?'已记录：没做出来':'已记录：做出来了');
+      };
+      act.appendChild(b);
+    }
+    card.appendChild(act);
+    box.appendChild(card);
+  }
+  window.scrollTo(0,0);
+}
+
 /* ================= 统计 ================= */
 async function loadMore(){
   const all=await dbGetAll('items');
@@ -770,8 +991,11 @@ async function loadMore(){
 
   const subs=[...new Set(all.map(i=>i.subject))].sort();
   $('subList').innerHTML=subs.map(s=>`<option value="${esc(s)}">`).join('');
-  const reasons=[...new Set(all.map(i=>i.reason).filter(Boolean))];
-  $('reasonList').innerHTML=reasons.map(s=>`<option value="${esc(s)}">`).join('');
+  const psel=$('pSubject');
+  if(psel){
+    const cur=psel.value;
+    psel.innerHTML='<option value="">全部科目</option>'+subs.map(s=>`<option${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+  }
 }
 
 /* ================= 备份 ================= */
@@ -815,7 +1039,7 @@ async function importData(file){
 /* ================= 换页 ================= */
 function show(v){
   view=v;
-  ['add','due','lib','more'].forEach(k=>$('v-'+k).hidden=(k!==v));
+  ['add','due','lib','more','practice'].forEach(k=>$('v-'+k).hidden=(k!==v));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   if(v==='lib')loadLib();
   if(v==='more')loadMore();
@@ -888,8 +1112,26 @@ function bindPaste(){
   let t=null; $('qText').oninput=()=>{clearTimeout(t);t=setTimeout(loadLib,220)};
   $('btnExport').onclick=exportData;
   $('btnImport').onclick=()=>$('impFile').click();
-  $('impFile').onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);e.target.value=''};
-  $('btnDelAll').onclick=delAll;
+  if($('impFile')) $('impFile').onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);e.target.value=''};
+  if($('btnDelAll')) $('btnDelAll').onclick=delAll;
+  /* 刷题模式 */
+  document.querySelectorAll('#pScope button').forEach(b=>b.onclick=()=>{
+    practiceScope=b.dataset.scope;
+    document.querySelectorAll('#pScope button').forEach(x=>x.classList.toggle('on',x===b));
+  });
+  if($('pSubject')) $('pSubject').onchange=async()=>{await savePracticePrefs();$('practiceList').innerHTML=''};
+  if($('btnPracticeStart')) $('btnPracticeStart').onclick=()=>startPractice(false);
+  if($('btnPracticeShuffle')) $('btnPracticeShuffle').onclick=()=>startPractice(true);
+  if($('btnPracticeFromLib')) $('btnPracticeFromLib').onclick=()=>{
+    const ids=lastLibList.map(i=>i.id);
+    if(!ids.length){toast('当前没有可刷的题');return}
+    practiceItems=lastLibList.slice();
+    practiceMap=new Map();
+    show('practice');
+    renderPractice();
+    $('practiceHint').textContent=`已从题库带入 ${ids.length} 题。做完一题点「对照答案」。`;
+    toast('已带入 '+ids.length+' 题');
+  };
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape')closeFocus();
     if(!document.querySelector('.focus'))return;
@@ -897,6 +1139,7 @@ function bindPaste(){
   });
   try{
     await refreshAll();
+    await restorePracticePrefs();
     show('due');
   }catch(e){
     fatal('数据读取失败',String(e&&e.message||e));
