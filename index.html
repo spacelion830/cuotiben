@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>考研错题本</title>
+<meta name="description" content="考研错题本：上传错题图片和文字，按艾宾浩斯曲线自动安排复习。">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6fed">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="错题本">
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --fg:#1f2329; --sub:#7a8294;
+    --line:#e6e8ec; --pri:#2f6fed; --ok:#12a150; --warn:#e08b00; --bad:#e5484d;
+    --r:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#15171b; --card:#1e2126; --fg:#e8eaed; --sub:#9aa2b1;
+           --line:#2c3037; --pri:#5b8def; }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    padding-bottom:72px;
+  }
+  header{
+    position:sticky; top:0; z-index:20; background:var(--card);
+    border-bottom:1px solid var(--line); padding:10px 14px;
+  }
+  header h1{margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+  header .who{font-size:12px;color:var(--sub);font-weight:400}
+  main{padding:14px;max-width:720px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+  label{display:block;font-size:13px;color:var(--sub);margin:12px 0 5px}
+  label:first-child{margin-top:0}
+  input[type=text],textarea,select{
+    width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);
+    border-radius:9px;padding:10px 11px;font:inherit;font-size:15px;outline:none;
+  }
+  input[type=text]:focus,textarea:focus,select:focus{border-color:var(--pri)}
+  textarea{resize:vertical;min-height:80px;line-height:1.65}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1;min-width:0}
+  button{
+    font:inherit;font-size:14px;border-radius:9px;border:1px solid var(--line);
+    background:var(--card);color:var(--fg);padding:9px 14px;cursor:pointer;font-weight:500;
+  }
+  button:active{transform:scale(.985)}
+  button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+  button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+  button.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+  button.warn{background:var(--warn);border-color:var(--warn);color:#fff}
+  button.ghost{background:transparent}
+  button.sm{padding:5px 10px;font-size:13px}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .btns button{flex:1;min-width:110px}
+
+  /* image picker */
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .thumb{position:relative;width:74px;height:74px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .x{
+    position:absolute;top:0;right:0;width:20px;height:20px;line-height:18px;text-align:center;
+    background:rgba(0,0,0,.62);color:#fff;font-size:13px;border:0;border-radius:0 0 0 8px;padding:0;cursor:pointer
+  }
+  .pick{
+    width:74px;height:74px;border:1.5px dashed var(--line);border-radius:9px;background:transparent;
+    color:var(--sub);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0
+  }
+
+  /* list */
+  .itemrow{position:relative}
+  .item{border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:11px;margin-bottom:9px;display:flex;gap:11px;cursor:pointer;width:100%;text-align:left;font:inherit;color:var(--fg)}
+  .item .pic{width:56px;height:56px;border-radius:8px;object-fit:cover;background:var(--bg);flex:0 0 auto}
+  .item .pic.ph{display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:11px;border:1px solid var(--line)}
+  .item .body{flex:1;min-width:0;padding-right:22px}
+  .item .t{font-size:14px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+  .itemrow .del{
+    position:absolute;top:9px;right:9px;width:28px;height:28px;border-radius:8px;padding:0;
+    border:1px solid var(--line);background:var(--card);color:var(--sub);font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.75
+  }
+  .itemrow .del:hover{color:var(--bad);border-color:var(--bad);opacity:1}
+  .meta{font-size:12px;color:var(--sub);margin-top:5px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:1px 8px;font-size:11px}
+  .tag.b{color:var(--bad);border-color:var(--bad)}
+  .tag.g{color:var(--ok);border-color:var(--ok)}
+  .tag.y{color:var(--warn);border-color:var(--warn)}
+
+  /* review */
+  .focus{position:fixed;inset:0;background:var(--bg);z-index:50;display:flex;flex-direction:column}
+  .focus .top{padding:11px 14px;border-bottom:1px solid var(--line);background:var(--card);display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--sub)}
+  .focus .scroll{flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch}
+  .focus .bottom{padding:11px 14px;border-top:1px solid var(--line);background:var(--card);display:flex;gap:8px}
+  .focus .bottom button{flex:1;padding:11px 4px;font-size:14px}
+  .imgwrap img{max-width:100%;border-radius:9px;display:block;margin-bottom:10px;border:1px solid var(--line);background:#fff}
+  .txt{white-space:pre-wrap;word-break:break-word;margin:8px 0}
+  .sec{font-size:12px;color:var(--sub);margin:14px 0 6px;letter-spacing:.06em}
+  .answer{border-top:1px dashed var(--line);margin-top:14px;padding-top:12px}
+  .empty{text-align:center;color:var(--sub);padding:46px 16px;font-size:14px}
+  .toast{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:88px;z-index:99;
+    background:rgba(0,0,0,.86);color:#fff;padding:9px 18px;border-radius:99px;font-size:14px;
+    opacity:0;transition:opacity .22s;pointer-events:none;max-width:82vw;text-align:center
+  }
+  .toast.on{opacity:1}
+
+  /* 确认弹窗 */
+  .modal{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:22px}
+  .modal-box{background:var(--card);border-radius:14px;max-width:340px;width:100%;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+  .modal-t{font-size:16px;font-weight:600;margin-bottom:7px}
+  .modal-d{font-size:13px;color:var(--sub);line-height:1.6;word-break:break-word}
+  .modal-btns{display:flex;gap:8px;margin-top:17px}
+  .modal-btns button{flex:1;padding:10px 0}
+
+  /* tabs */
+  nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);
+    border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)
+  }
+  nav button{
+    flex:1;border:0;background:transparent;border-radius:0;padding:11px 2px;font-size:12px;color:var(--sub);
+    display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:500
+  }
+  nav button.on{color:var(--pri)}
+  nav .ic{font-size:19px;line-height:1}
+  nav .badge{position:absolute;transform:translate(18px,-6px);background:var(--bad);color:#fff;font-size:10px;padding:0 5px;border-radius:99px;min-width:16px}
+  .hint{font-size:12px;color:var(--sub);margin-top:7px;line-height:1.55}
+  .stat{display:flex;gap:10px;flex-wrap:wrap}
+  .stat .s{flex:1;min-width:88px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+  .stat .n{font-size:23px;font-weight:600;line-height:1.2}
+  .stat .l{font-size:12px;color:var(--sub);margin-top:3px}
+  .filters{display:flex;gap:8px;margin-bottom:12px}
+  .filters input,.filters select{flex:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>错题本</span><span class="who" id="who"></span></h1>
+</header>
+
+<main>
+  <!-- ===== 录入 ===== -->
+  <section id="v-add">
+    <div class="card">
+      <label>题目图片（可多张，建议只放题干、别放答案）</label>
+      <div class="thumbs" id="thStem"></div>
+
+      <label>题目文字（可选，粘贴 AI 扫描结果 / 手打）</label>
+      <textarea id="fText" placeholder="直接粘贴即可，换行会原样保留"></textarea>
+
+      <div class="row">
+        <div>
+          <label>科目</label>
+          <input type="text" id="fSubject" list="subList" placeholder="如 数学一">
+          <datalist id="subList"></datalist>
+        </div>
+        <div>
+          <label>来源</label>
+          <input type="text" id="fSource" placeholder="如 2023 真题">
+        </div>
+      </div>
+
+      <label>错因（强烈建议填，这是全库最有价值的字段）</label>
+      <input type="text" id="fReason" list="reasonList" placeholder="概念不清 / 计算失误 / 粗心看错 / 没思路 / 时间不够">
+      <datalist id="reasonList"></datalist>
+    </div>
+
+    <div class="card">
+      <label>解析 / 答案（可选，但建议放；复习时会被遮住）</label>
+      <div class="thumbs" id="thAns"></div>
+      <textarea id="fAnsText" placeholder="解析文字，可选"></textarea>
+    </div>
+
+    <div class="btns">
+      <button class="pri" id="btnSave">保存到错题库</button>
+      <button class="ghost" id="btnClear">清空</button>
+    </div>
+    <div class="hint">保存后会自动进入艾宾浩斯复习队列（1 / 3 / 7 / 15 / 30 天）。</div>
+  </section>
+
+  <!-- ===== 复习 ===== -->
+  <section id="v-due" hidden>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:22px;font-weight:600" id="dueCount">0 题</div>
+          <div class="hint" style="margin-top:2px">今天需要复习</div>
+        </div>
+        <button class="pri" id="btnStart" disabled>开始复习</button>
+      </div>
+    </div>
+    <div id="dueList"></div>
+  </section>
+
+  <!-- ===== 题库 ===== -->
+  <section id="v-lib" hidden>
+    <div class="filters">
+      <select id="qSubject"><option value="">全部科目</option></select>
+      <select id="qMastery">
+        <option value="">全部状态</option>
+        <option value="0">未掌握</option>
+        <option value="1">模糊</option>
+        <option value="2">已掌握</option>
+      </select>
+    </div>
+    <input type="text" id="qText" placeholder="搜索题目文字 / 来源 / 错因" style="margin-bottom:12px">
+    <div id="libList"></div>
+  </section>
+
+  <!-- ===== 数据 ===== -->
+  <section id="v-more" hidden>
+    <div class="stat" style="margin-bottom:12px">
+      <div class="s"><div class="n" id="stTotal">0</div><div class="l">错题总数</div></div>
+      <div class="s"><div class="n" id="stMastered">0</div><div class="l">已掌握</div></div>
+      <div class="s"><div class="n" id="stDue">0</div><div class="l">待复习</div></div>
+    </div>
+    <div class="card">
+      <label>按错因统计（这张表告诉你该练什么）</label>
+      <div id="reasonStat" class="hint">暂无数据</div>
+    </div>
+    <div class="card">
+      <label>数据备份（务必定期导出，自用工具最大的风险是数据）</label>
+      <div class="btns" style="margin-top:10px">
+        <button id="btnExport">导出 JSON 备份</button>
+        <button id="btnImport">导入备份</button>
+      </div>
+      <input type="file" id="impFile" accept="application/json" hidden>
+      <div class="hint">导出文件含图片，可换设备导入。</div>
+    </div>
+    <div class="card">
+      <label>清空整个错题库（危险）</label>
+      <div class="btns" style="margin-top:10px">
+        <button id="btnDelAll" class="ghost" style="color:var(--bad);border-color:var(--bad)">删除全部错题</button>
+      </div>
+      <div class="hint">会删掉所有错题、复习记录和图片。操作前建议先导出备份。</div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-v="due" class="on"><span class="ic">🔁</span>复习<span class="badge" id="navBadge" hidden></span></button>
+  <button data-v="lib"><span class="ic">📚</span>题库</button>
+  <button data-v="add"><span class="ic">➕</span>录入</button>
+  <button data-v="more"><span class="ic">📊</span>数据</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= IndexedDB ================= */
+const DB_NAME='kaoyan_wrongbook_v1';
+let db=null;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('items')){
+        const s=d.createObjectStore('items',{keyPath:'id',autoIncrement:true});
+        s.createIndex('nextReviewAt','nextReviewAt');
+        s.createIndex('subject','subject');
+      }
+      if(!d.objectStoreNames.contains('reviews')){
+        const s=d.createObjectStore('reviews',{keyPath:'id',autoIncrement:true});
+        s.createIndex('itemId','itemId');
+      }
+      if(!d.objectStoreNames.contains('files'))
+        d.createObjectStore('files',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('meta'))
+        d.createObjectStore('meta',{keyPath:'k'});
+    };
+    r.onsuccess=e=>{db=e.target.result;res(db)};
+    r.onerror=e=>rej(e.target.error);
+  });
+}
+function tx(store,mode='readonly'){return db.transaction(store,mode).objectStore(store)}
+function req(r){return new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+const dbGetAll=(s)=>req(tx(s).getAll());
+const dbGet=(s,k)=>req(tx(s).get(k));
+const dbPut=(s,v)=>req(tx(s,'readwrite').put(v));
+const dbAdd=(s,v)=>req(tx(s,'readwrite').add(v));
+const dbDel=(s,k)=>req(tx(s,'readwrite').delete(k));
+const dbClear=s=>req(tx(s,'readwrite').clear());
+
+/* ================= 图片：压缩 + 存 Blob ================= */
+async function saveImage(file){
+  const blob=await compress(file,1400,0.8);
+  const id=(crypto.randomUUID?crypto.randomUUID():'f'+Date.now()+Math.random().toString(16).slice(2));
+  await dbPut('files',{id,blob,type:blob.type});
+  return id;
+}
+function compress(file,maxSide,quality){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let {width:w,height:h}=img;
+      const scale=Math.min(1,maxSide/Math.max(w,h));
+      w=Math.round(w*scale); h=Math.round(h*scale);
+      const c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      const ctx=c.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);   // 透明背景转白，试卷图更清晰
+      ctx.drawImage(img,0,0,w,h);
+      c.toBlob(b=>b?res(b):rej(new Error('压缩失败')),'image/jpeg',quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('图片读取失败'))};
+    img.src=url;
+  });
+}
+const urlCache=new Map();
+async function fileURL(id){
+  if(urlCache.has(id))return urlCache.get(id);
+  const f=await dbGet('files',id);
+  if(!f)return null;
+  const u=URL.createObjectURL(f.blob);
+  urlCache.set(id,u);
+  return u;
+}
+
+/* ================= 艾宾浩斯 ================= */
+const INTERVALS=[1,3,7,15,30,60];
+const DAY=86400000;
+const startOfDay=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
+function nextDate(round,from=Date.now()){
+  const n=INTERVALS[Math.min(round,INTERVALS.length-1)];
+  return startOfDay(from)+n*DAY;
+}
+const fmtDate=t=>{const d=new Date(t);return `${d.getMonth()+1}月${d.getDate()}日`};
+const MASTERY=['未掌握','模糊','已掌握'];
+
+/* ================= 状态 ================= */
+let stemBuf=[], ansBuf=[], view='due', reviewQueue=[], reviewIdx=0, reviewShowAns=false;
+
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+let toastTimer=null;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('on'),1900);
+}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function firstLine(item){
+  const t=(item.text||'').trim();
+  if(t)return t.split('\n').find(l=>l.trim())||t;
+  return item.source?`【${item.source}】图片题`:'图片题';
+}
+/* 确认弹窗：返回 true=确认，false=取消 */
+function confirmBox(title,desc,okText){
+  return new Promise(res=>{
+    const wrap=document.createElement('div');
+    wrap.className='modal';
+    const box=document.createElement('div');
+    box.className='modal-box';
+    const h=document.createElement('div');
+    h.className='modal-t'; h.textContent=title;
+    const p=document.createElement('div');
+    p.className='modal-d'; p.textContent=desc||'';
+    const btns=document.createElement('div');
+    btns.className='modal-btns';
+    const no=document.createElement('button');
+    no.type='button'; no.className='ghost'; no.textContent='取消';
+    const yes=document.createElement('button');
+    yes.type='button'; yes.className='bad'; yes.textContent=okText||'删除';
+    btns.appendChild(no); btns.appendChild(yes);
+    box.appendChild(h); if(desc)box.appendChild(p); box.appendChild(btns);
+    wrap.appendChild(box);
+    document.body.appendChild(wrap);
+    const done=v=>{
+      document.removeEventListener('keydown',onKey);
+      wrap.remove();
+      res(v);
+    };
+    const onKey=e=>{
+      if(e.key==='Escape'){e.stopPropagation();done(false)}
+      if(e.key==='Enter'){e.preventDefault();done(true)}
+    };
+    no.onclick=()=>done(false);
+    yes.onclick=()=>done(true);
+    wrap.onclick=e=>{if(e.target===wrap)done(false)};
+    document.addEventListener('keydown',onKey);
+    setTimeout(()=>yes.focus(),0);
+  });
+}
+
+/* ================= 图片选择器 ================= */
+function renderThumbs(box,buf){
+  box.innerHTML='';
+  buf.forEach((id,i)=>{
+    const d=document.createElement('div');
+    d.className='thumb';
+    const img=document.createElement('img');
+    fileURL(id).then(u=>{if(u)img.src=u});
+    const x=document.createElement('button');
+    x.className='x'; x.textContent='×'; x.type='button';
+    x.onclick=()=>{buf.splice(i,1);renderThumbs(box,buf)};
+    d.appendChild(img); d.appendChild(x);
+    box.appendChild(d);
+  });
+  const add=document.createElement('button');
+  add.className='pick'; add.type='button'; add.textContent='＋';
+  add.onclick=()=>pickImages(buf,box);
+  box.appendChild(add);
+}
+function pickImages(buf,box){
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept='image/*';
+  inp.multiple=true;
+  // 关键：必须挂进 DOM 再 click()，否则 iOS Safari / 微信浏览器会静默忽略这次点击
+  inp.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+  document.body.appendChild(inp);
+  inp.onchange=async()=>{
+    const files=[...(inp.files||[])];
+    inp.remove();
+    if(!files.length)return;
+    toast('正在处理 '+files.length+' 张图片…');
+    let n=0;
+    for(const f of files){
+      try{ buf.push(await saveImage(f)); n++ }catch(e){ toast('图片处理失败：'+(e.message||e)) }
+    }
+    renderThumbs(box,buf);
+    if(n)toast('已添加 '+n+' 张图片');
+  };
+  inp.click();
+}
+
+/* ================= 录入 ================= */
+async function saveItem(){
+  const text=$('fText').value.trim();
+  if(!stemBuf.length && !text){ toast('至少要有题目图片或题目文字'); return }
+  const now=Date.now();
+  const item={
+    stemImages:stemBuf.slice(), ansImages:ansBuf.slice(),
+    text,
+    answerText:$('fAnsText').value.trim(),
+    subject:($('fSubject').value.trim()||'未分类'),
+    source:$('fSource').value.trim(),
+    reason:$('fReason').value.trim(),
+    mastery:0, round:0,
+    createdAt:now, nextReviewAt:startOfDay(now)+1*DAY, lastReviewedAt:null
+  };
+  await dbAdd('items',item);
+  stemBuf=[]; ansBuf=[];
+  renderThumbs($('thStem'),stemBuf); renderThumbs($('thAns'),ansBuf);
+  $('fText').value=''; $('fAnsText').value=''; $('fReason').value='';
+  toast('已保存，明天进入复习队列');
+  await refreshAll();
+}
+function clearForm(){
+  stemBuf=[]; ansBuf=[];
+  renderThumbs($('thStem'),stemBuf); renderThumbs($('thAns'),ansBuf);
+  ['fText','fAnsText','fSubject','fSource','fReason'].forEach(i=>$(i).value='');
+  toast('已清空');
+}
+
+/* ================= 列表渲染 ================= */
+async function itemRow(it,onClick,onDelete){
+  const el=document.createElement('div');
+  el.className='itemrow';
+
+  const open=document.createElement('button');
+  open.type='button'; open.className='item';
+  let picHTML='';
+  if(it.stemImages && it.stemImages.length){
+    const u=await fileURL(it.stemImages[0]);
+    picHTML=u?`<img class="pic" src="${u}">`:'<div class="pic ph">无图</div>';
+  }else{
+    picHTML='<div class="pic ph">纯文字</div>';
+  }
+  const m=MASTERY[it.mastery]||'未掌握';
+  const mcls=it.mastery===2?'g':(it.mastery===1?'y':'b');
+  open.innerHTML=`
+    ${picHTML}
+    <div class="body">
+      <div class="t">${esc(firstLine(it))}</div>
+      <div class="meta">
+        <span class="tag">${esc(it.subject)}</span>
+        ${it.source?`<span class="tag">${esc(it.source)}</span>`:''}
+        ${it.reason?`<span class="tag">${esc(it.reason)}</span>`:''}
+        <span class="tag ${mcls}">${m}</span>
+        <span>第 ${it.round} 轮</span>
+        <span>下次 ${fmtDate(it.nextReviewAt)}</span>
+      </div>
+    </div>`;
+  open.onclick=()=>onClick(it);
+  el.appendChild(open);
+
+  const del=document.createElement('button');
+  del.type='button'; del.className='del'; del.textContent='🗑';
+  del.title='删除这道错题'; del.setAttribute('aria-label','删除这道错题');
+  del.onclick=e=>{e.stopPropagation();(onDelete||defaultDelete)(it)};
+  el.appendChild(del);
+  return el;
+}
+function defaultDelete(it){ delItem(it) }
+
+/* ================= 删除 ================= */
+async function delReviewRecords(itemId){
+  const list=await req(tx('reviews').index('itemId').getAll(itemId));
+  for(const r of list)await dbDel('reviews',r.id);
+}
+async function fileUsedElsewhere(fileId,excludeItemId){
+  const all=await dbGetAll('items');
+  for(const x of all){
+    if(x.id===excludeItemId)continue;
+    if((x.stemImages||[]).includes(fileId))return true;
+    if((x.ansImages||[]).includes(fileId))return true;
+  }
+  return false;
+}
+/* 直接删除，不弹确认（调用方负责确认） */
+async function delItemDirect(it){
+  await delReviewRecords(it.id);
+  for(const id of [...(it.stemImages||[]),...(it.ansImages||[])]){
+    if(await fileUsedElsewhere(id,it.id))continue;
+    await dbDel('files',id);
+    const u=urlCache.get(id);
+    if(u){URL.revokeObjectURL(u);urlCache.delete(id)}
+  }
+  await dbDel('items',it.id);
+}
+/* 带确认的删除（题库里用） */
+async function delItem(it){
+  const ok=await confirmBox('删除这道错题？','「'+firstLine(it).slice(0,40)+'」和它的复习记录会一起删掉，无法撤销。');
+  if(!ok)return;
+  await delItemDirect(it);
+  await refreshAll();
+  toast('已删除');
+}
+/* 删除整个题库（数据页用） */
+async function delAll(){
+  const all=await dbGetAll('items');
+  if(!all.length){toast('库是空的');return}
+  const ok=await confirmBox('清空整个错题库？','将删除全部 '+all.length+' 道错题、所有复习记录和图片。建议先导出备份。此操作无法撤销。');
+  if(!ok)return;
+  await dbClear('items'); await dbClear('reviews'); await dbClear('files');
+  for(const u of urlCache.values())URL.revokeObjectURL(u);
+  urlCache.clear();
+  await refreshAll();
+  toast('已清空，共删除 '+all.length+' 题');
+}
+
+/* ================= 复习队列 ================= */
+async function loadDue(){
+  const all=await dbGetAll('items');
+  const today=startOfDay(Date.now())+DAY;   // 今天结束
+  reviewQueue=all.filter(i=>i.nextReviewAt<today).sort((a,b)=>a.nextReviewAt-b.nextReviewAt);
+  $('dueCount').textContent=reviewQueue.length+' 题';
+  $('btnStart').disabled=!reviewQueue.length;
+  const box=$('dueList'); box.innerHTML='';
+  if(!reviewQueue.length){
+    box.innerHTML='<div class="empty">今天没有待复习的题 🎉<br><span style="font-size:12px">去「题库」看看，或「录入」新错题</span></div>';
+    return reviewQueue;
+  }
+  for(const it of reviewQueue){
+    box.appendChild(await itemRow(it,openReview,async()=>{
+      const ok=await confirmBox('删除这道错题？','删掉后它就不会再出现在复习队列里，无法撤销。');
+      if(!ok)return;
+      await delItemDirect(it);
+      toast('已删除');
+      await refreshAll();
+    }));
+  }
+  return reviewQueue;
+}
+
+async function openReview(item){
+  reviewQueue=[item];         // 单题进入
+  startReview();
+}
+function startReview(){
+  if(!reviewQueue.length)return;
+  reviewIdx=0; reviewShowAns=false;
+  renderFocus();
+}
+async function renderFocus(){
+  const it=reviewQueue[reviewIdx];
+  if(!it){ closeFocus(); return }
+  const el=document.createElement('div');
+  el.className='focus';
+
+  const top=document.createElement('div');
+  top.className='top';
+  top.innerHTML=`<span>${esc(it.subject)}${it.source?' · '+esc(it.source):''} · 第 ${it.round} 轮</span>
+                 <span style="display:flex;gap:8px;align-items:center">
+                   <button class="ghost sm" id="fDel" style="color:var(--bad)">删除</button>
+                   <button class="ghost sm" id="fClose">关闭</button>
+                 </span>`;
+
+  const scroll=document.createElement('div');
+  scroll.className='scroll';
+
+  const stem=document.createElement('div');
+  stem.className='imgwrap';
+  for(const id of (it.stemImages||[])){
+    const u=await fileURL(id);
+    if(u){const im=document.createElement('img');im.src=u;stem.appendChild(im)}
+  }
+  scroll.appendChild(stem);
+
+  if(it.text){
+    const t=document.createElement('div');
+    t.className='txt'; t.textContent=it.text;
+    scroll.appendChild(t);
+  }
+
+  if(reviewShowAns){
+    const ans=document.createElement('div');
+    ans.className='answer';
+    const h=document.createElement('div');h.className='sec';h.textContent='解析 / 答案';
+    ans.appendChild(h);
+    if(it.reason){
+      const r=document.createElement('div');
+      r.className='txt';
+      r.innerHTML='<b style="color:var(--warn)">上次错因：</b>'+esc(it.reason);
+      ans.appendChild(r);
+    }
+    if(it.answerText){
+      const at=document.createElement('div');
+      at.className='txt'; at.textContent=it.answerText;
+      ans.appendChild(at);
+    }
+    for(const id of (it.ansImages||[])){
+      const u=await fileURL(id);
+      if(u){const im=document.createElement('img');im.src=u;ans.appendChild(im)}
+    }
+    if(!it.answerText && !(it.ansImages||[]).length && !it.reason){
+      const d=document.createElement('div');
+      d.className='hint'; d.textContent='这道题没有录入解析。';
+      ans.appendChild(d);
+    }
+    scroll.appendChild(ans);
+  }
+
+  const bottom=document.createElement('div');
+  bottom.className='bottom';
+  if(!reviewShowAns){
+    bottom.innerHTML=`<button class="pri" id="fShow">看解析</button>
+                      <button class="ghost" id="fSkip">跳过</button>`;
+  }else{
+    bottom.innerHTML=`<button class="bad" id="r0">仍不会</button>
+                      <button class="warn" id="r1">对了但侥幸</button>
+                      <button class="ok" id="r2">完全会了</button>`;
+  }
+
+  el.appendChild(top); el.appendChild(scroll); el.appendChild(bottom);
+  document.querySelectorAll('.focus').forEach(n=>n.remove());
+  document.body.appendChild(el);
+
+  $('fClose').onclick=closeFocus;
+  if($('fDel')) $('fDel').onclick=async()=>{
+    const ok=await confirmBox('删除这道错题？','删除后无法撤销，它的复习记录也会一起移除。');
+    if(!ok)return;
+    await delItemDirect(it);
+    document.querySelectorAll('.focus').forEach(n=>n.remove());
+    reviewShowAns=false;
+    toast('已删除');
+    await refreshAll();
+  };
+  if($('fShow')) $('fShow').onclick=()=>{reviewShowAns=true;renderFocus();
+    setTimeout(()=>{document.querySelector('.focus .scroll').scrollTop=0},0)};
+  if($('fSkip')) $('fSkip').onclick=()=>{reviewIdx++;reviewShowAns=false;renderFocus()};
+  ['r0','r1','r2'].forEach(id=>{
+    const b=$(id); if(b) b.onclick=()=>grade(parseInt(id.slice(1)));
+  });
+}
+function closeFocus(){
+  document.querySelectorAll('.focus').forEach(n=>n.remove());
+  reviewShowAns=false;
+  refreshAll();
+}
+async function grade(result){
+  const it=reviewQueue[reviewIdx];
+  if(!it)return;
+  const now=Date.now();
+  await dbAdd('reviews',{itemId:it.id,round:it.round,result,reviewedAt:now});
+
+  let round=it.round, mastery=it.mastery;
+  if(result===0){ round=0; mastery=0 }                          // 仍不会 → 打回第一轮，明天重来
+  else if(result===1){ round=it.round; mastery=Math.max(mastery,1) }   // 侥幸 → 轮次不前进
+  else if(result===2){ round=it.round+1; mastery=round>=3?2:1 } // 走满 3 轮算真掌握
+
+  const upd=Object.assign({},it,{
+    round, mastery,
+    lastReviewedAt:now,
+    nextReviewAt:nextDate(round,now)
+  });
+  await dbPut('items',upd);
+  toast(result===0?'已打回，明天重来':(result===2?'已掌握，复习间隔拉长':'已记录'));
+  reviewIdx++; reviewShowAns=false;
+  if(reviewIdx>=reviewQueue.length){
+    closeFocus();
+    toast('这一轮复习完成 ✅');
+  }else{
+    renderFocus();
+  }
+}
+
+/* ================= 题库 ================= */
+async function loadLib(){
+  const all=await dbGetAll('items');
+  const sub=$('qSubject').value, mas=$('qMastery').value, kw=$('qText').value.trim().toLowerCase();
+  const sel=$('qSubject');
+  const subs=[...new Set(all.map(i=>i.subject))].sort();
+  const cur=sel.value;
+  sel.innerHTML='<option value="">全部科目</option>'+subs.map(s=>`<option${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+
+  let list=all.filter(i=>{
+    if(sub && i.subject!==sub)return false;
+    if(mas!=='' && String(i.mastery)!==mas)return false;
+    if(kw){
+      const hay=((i.text||'')+(i.source||'')+(i.reason||'')+i.subject).toLowerCase();
+      if(!hay.includes(kw))return false;
+    }
+    return true;
+  }).sort((a,b)=>b.createdAt-a.createdAt);
+
+  const box=$('libList'); box.innerHTML='';
+  if(!list.length){ box.innerHTML='<div class="empty">没有匹配的错题</div>'; return }
+  for(const it of list){
+    box.appendChild(await itemRow(it,it=>{
+      reviewQueue=[it]; reviewIdx=0; reviewShowAns=false; renderFocus();
+    }));
+  }
+  const bar=document.createElement('div');
+  bar.style.cssText='text-align:center;padding:18px 0 6px';
+  const b=document.createElement('button');
+  b.type='button'; b.className='ghost'; b.textContent='删除当前筛选结果';
+  b.style.color='var(--bad)';
+  b.onclick=async()=>{
+    const ok=await confirmBox('删除筛选出的 '+list.length+' 道错题？','这 '+list.length+' 道题和它们的复习记录会被一并删除，无法撤销。');
+    if(!ok)return;
+    for(const it of list)await delItemDirect(it);
+    await refreshAll();
+    toast('已删除 '+list.length+' 题');
+  };
+  bar.appendChild(b);
+  box.appendChild(bar);
+}
+
+/* ================= 统计 ================= */
+async function loadMore(){
+  const all=await dbGetAll('items');
+  const today=startOfDay(Date.now())+DAY;
+  $('stTotal').textContent=all.length;
+  $('stMastered').textContent=all.filter(i=>i.mastery===2).length;
+  $('stDue').textContent=all.filter(i=>i.nextReviewAt<today).length;
+
+  const byReason={};
+  all.forEach(i=>{const k=i.reason||'未填写';byReason[k]=(byReason[k]||0)+1});
+  const rows=Object.entries(byReason).sort((a,b)=>b[1]-a[1]);
+  $('reasonStat').innerHTML=rows.length
+    ? rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)">
+        <span>${esc(k)}</span><b>${v} 题</b></div>`).join('')
+    : '暂无数据';
+
+  const subs=[...new Set(all.map(i=>i.subject))].sort();
+  $('subList').innerHTML=subs.map(s=>`<option value="${esc(s)}">`).join('');
+  const reasons=[...new Set(all.map(i=>i.reason).filter(Boolean))];
+  $('reasonList').innerHTML=reasons.map(s=>`<option value="${esc(s)}">`).join('');
+}
+
+/* ================= 备份 ================= */
+async function exportData(){
+  const items=await dbGetAll('items');
+  const reviews=await dbGetAll('reviews');
+  const files=await dbGetAll('files');
+  const filesOut=[];
+  for(const f of files){
+    const buf=await f.blob.arrayBuffer();
+    filesOut.push({id:f.id,type:f.type,b64:btoa(String.fromCharCode(...new Uint8Array(buf)))});
+  }
+  const payload={version:1,exportedAt:Date.now(),items,reviews,files:filesOut};
+  const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='错题本备份-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('已导出');
+}
+async function importData(file){
+  try{
+    const data=JSON.parse(await file.text());
+    if(!data.items)throw new Error('文件格式不对');
+    await dbClear('items'); await dbClear('reviews'); await dbClear('files');
+    for(const f of (data.files||[])){
+      const bin=atob(f.b64);
+      const arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+      await dbPut('files',{id:f.id,blob:new Blob([arr],{type:f.type}),type:f.type});
+    }
+    for(const it of data.items)await dbPut('items',it);
+    for(const r of (data.reviews||[]))await dbPut('reviews',r);
+    urlCache.clear();
+    toast('导入成功');
+    await refreshAll();
+  }catch(e){ toast('导入失败：'+e.message) }
+}
+
+/* ================= 换页 ================= */
+function show(v){
+  view=v;
+  ['add','due','lib','more'].forEach(k=>$('v-'+k).hidden=(k!==v));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(v==='lib')loadLib();
+  if(v==='more')loadMore();
+  window.scrollTo(0,0);
+}
+async function refreshAll(){
+  const all=await dbGetAll('items');
+  const today=startOfDay(Date.now())+DAY;
+  const due=all.filter(i=>i.nextReviewAt<today).length;
+  const b=$('navBadge');
+  b.hidden=!due; b.textContent=due>99?'99+':due;
+  $('who').textContent=all.length?`共 ${all.length} 题`:'';
+  if(view==='due')await loadDue();
+  if(view==='lib')await loadLib();
+  if(view==='more')await loadMore();
+}
+
+/* ================= 启动 ================= */
+function fatal(msg,detail){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;z-index:999;background:var(--card);overflow:auto;padding:20px;font-size:14px;line-height:1.7';
+  d.innerHTML=`<h2 style="margin:0 0 12px;font-size:17px">无法启动</h2>
+    <p style="color:var(--bad)"><b>${esc(msg)}</b></p>
+    <p>这通常是因为浏览器禁用了本地存储，或者你在用无痕模式。</p>
+    <p style="color:var(--sub)">当前环境：<br><code style="font-size:12px;word-break:break-all">${esc(location.href)}</code></p>
+    ${detail?`<pre style="white-space:pre-wrap;font-size:12px;color:var(--sub);background:var(--bg);padding:10px;border-radius:8px">${esc(detail)}</pre>`:''}`;
+  document.body.appendChild(d);
+}
+
+/* 支持直接粘贴截图（电脑上 Ctrl+V，比选文件快得多） */
+function bindPaste(){
+  document.addEventListener('paste',async e=>{
+    if(view!=='add')return;
+    const items=[...(e.clipboardData?.items||[])];
+    const imgs=items.filter(i=>i.type.startsWith('image/'));
+    if(!imgs.length)return;
+    e.preventDefault();
+    toast('正在处理粘贴的图片…');
+    let n=0;
+    for(const it of imgs){
+      const f=it.getAsFile();
+      if(!f)continue;
+      try{ stemBuf.push(await saveImage(f)); n++ }catch(err){ toast('处理失败：'+(err.message||err)) }
+    }
+    renderThumbs($('thStem'),stemBuf);
+    if(n)toast('已从剪贴板添加 '+n+' 张图片');
+  });
+}
+
+(async function init(){
+  try{
+    await openDB();
+  }catch(e){
+    fatal('浏览器本地数据库打开失败',String(e&&e.message||e));
+    return;
+  }
+  if(!db){
+    fatal('浏览器本地数据库不可用');
+    return;
+  }
+  renderThumbs($('thStem'),stemBuf);
+  renderThumbs($('thAns'),ansBuf);
+  bindPaste();
+  document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+  $('btnSave').onclick=saveItem;
+  $('btnClear').onclick=clearForm;
+  $('btnStart').onclick=()=>{if(reviewQueue.length){reviewIdx=0;reviewShowAns=false;renderFocus()}};
+  $('qSubject').onchange=loadLib;
+  $('qMastery').onchange=loadLib;
+  let t=null; $('qText').oninput=()=>{clearTimeout(t);t=setTimeout(loadLib,220)};
+  $('btnExport').onclick=exportData;
+  $('btnImport').onclick=()=>$('impFile').click();
+  $('impFile').onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);e.target.value=''};
+  $('btnDelAll').onclick=delAll;
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape')closeFocus();
+    if(!document.querySelector('.focus'))return;
+    if(e.key===' '){e.preventDefault();if(!reviewShowAns){reviewShowAns=true;renderFocus()}else grade(2)}
+  });
+  try{
+    await refreshAll();
+    show('due');
+  }catch(e){
+    fatal('数据读取失败',String(e&&e.message||e));
+  }
+})();
+
+/* 注册离线缓存：只有通过 http/https 打开时才生效，
+   直接双击打开（file://）会跳过，不影响本地使用 */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
